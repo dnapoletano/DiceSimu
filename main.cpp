@@ -214,7 +214,7 @@ std::string get_key(const bool wait = false) {
 }
 
 
-int main() {
+int main(int argc, char** argv) {
   std::random_device rd;
   std::mt19937 eng(rd());
   std::uniform_int_distribution<> distr(1, 6);
@@ -229,20 +229,23 @@ int main() {
 
   draw_init_screen(ScreenCentre.y, ScreenCentre.x-13);
 
-
+  const size_t ndice = (argc > 1) ? std::atoi(argv[1]) : 2;
 
   while (true) {
     char c = _getch();
     if (c == 'r') {
-      clear_init_screen(ScreenCentre.y, ScreenCentre.x-13);
-      draw_screen_divisor(rows, ScreenCentre.x);
+      clear_init_screen(ScreenCentre.y, ScreenCentre.x - 13);
+      if(ndice == 2)
+        draw_screen_divisor(rows, ScreenCentre.x);
       for (int i{0}; i < 1000; ++i) {
         usleep(500);
-        set_curs_position({ScreenCentre.y - 3, ScreenCentre.x - 9});
+        const int xoffset = (ndice == 2) ? 9 : 3;
+        set_curs_position({ScreenCentre.y - 3, ScreenCentre.x - xoffset});
         d.GetFigure(distr(eng));
-
-        set_curs_position({ScreenCentre.y - 3, ScreenCentre.x + 3});
-        d.GetFigure(distr(eng));
+        if(ndice == 2){
+          set_curs_position({ScreenCentre.y - 3, ScreenCentre.x + 3});
+          d.GetFigure(distr(eng));
+        }
       }
     } else if (c == 'q') {
       break;
