@@ -1,11 +1,19 @@
+#include <fstream>
 #include <iostream>
 #include <random>
-#include <sstream>
+#include <string>
 
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+
+struct Player {
+  std::string name;
+  int score = 0;
+  bool is_turn = false;
+};
+
 
 struct Point {
   int y,x;
@@ -19,6 +27,7 @@ private:
 public:
   Dice() {}
   void GetFigure(int number) {
+    _value = number;
     switch (number) {
     case 1:
       one();
@@ -41,9 +50,10 @@ public:
     default:
       break;
     }
-
-
   }
+
+  int GetValue() {return _value;}
+
   void RollDice(std::uniform_int_distribution<> &_distr,
                 std::mt19937 &_eng) {
     for (size_t i{0}; i < 100; ++i) {
@@ -188,6 +198,17 @@ void clear_init_screen(const int ypos, const int xpos) {
     std::cout << "                          ";
 }
 
+void draw_player_score(const Player &player, const int ypos, const int xpos){
+  /// y,x are the coordinates of the upper right corner of the text box
+  set_curs_position({ypos, xpos});
+  const int textwidth = player.name.size() + 4;
+  const int scorepos = textwidth / 2;
+  std::string color_modifier = player.is_turn ? "\x1b[48;5;172m" : "";
+  std::string reset_color = player.is_turn ? "\x1b[0m": "";
+  std::cout << color_modifier << "  " << player.name << "  ";
+  set_curs_position({ypos+2, xpos + scorepos});
+  std::cout << player.score << reset_color;
+}
 
 bool _kbhit() {
   _enable_raw_mode();
@@ -213,6 +234,40 @@ std::string get_key(const bool wait = false) {
   }
 }
 
+void read_score(Player &player, const int value, const int ypos,
+                const int xpos) {
+  set_curs_position({ypos, xpos});
+  std::cout << "\x1b[48;5;105m" << "Colpito (c), mancato (x)" << "\x1b[0m";
+  while (true) {
+    const char c = _getch();
+    if (c == 'c') {
+      player.score = player.score + 20;
+      break;
+    } else if (c == 'x') {
+      player.score = player.score - 5;
+      break;
+    }
+  }
+  set_curs_position({ypos, xpos});
+  std::cout << "                        ";
+  if (value == 1 or value == 6) {
+     set_curs_position({ypos, xpos-4});
+     std::cout << "\x1b[48;5;105m" << "Distratto (y), non distratto (n)" << "\x1b[0m";
+
+     while (true) {
+       const char c = _getch();
+       if (c == 'y') {
+         player.score = player.score + 10;
+         break;
+       } else if (c == 'n') {
+         break;
+       }
+     }
+     set_curs_position({ypos, xpos-4});
+     std::cout << "                                ";
+  }
+}
+
 
 int main(int argc, char** argv) {
   std::random_device rd;
@@ -227,14 +282,24 @@ int main(int argc, char** argv) {
 
   clear_screen();
 
-  draw_init_screen(ScreenCentre.y, ScreenCentre.x-13);
+  draw_init_screen(ScreenCentre.y, ScreenCentre.x - 13);
+  Player p1{.name = (argc > 2) ? argv[2] : "player1", .score = 0};
+  Player p2{.name = (argc > 3) ? argv[3] : "player2", .score = 0};
 
   const size_t ndice = (argc > 1) ? std::atoi(argv[1]) : 2;
 
+  int turn_count = 0;
   while (true) {
+    p1.is_turn = p2.is_turn = false;
     char c = _getch();
     if (c == 'r') {
+      Player &current_player = (turn_count++ % 2 == 0) ? p1 : p2;
+      current_player.is_turn = true;
+
       clear_init_screen(ScreenCentre.y, ScreenCentre.x - 13);
+      draw_player_score(p1, 10, 10);
+      draw_player_score(p2, 10,cols - p2.name.size() - 2 - 10);
+
       if(ndice == 2)
         draw_screen_divisor(rows, ScreenCentre.x);
       for (int i{0}; i < 1000; ++i) {
@@ -242,11 +307,17 @@ int main(int argc, char** argv) {
         const int xoffset = (ndice == 2) ? 9 : 3;
         set_curs_position({ScreenCentre.y - 3, ScreenCentre.x - xoffset});
         d.GetFigure(distr(eng));
+
         if(ndice == 2){
           set_curs_position({ScreenCentre.y - 3, ScreenCentre.x + 3});
           d.GetFigure(distr(eng));
         }
       }
+
+      read_score(current_player, d.GetValue(),
+                 ScreenCentre.y+25, ScreenCentre.x - 13);
+      draw_player_score(p1, 10, 10);
+      draw_player_score(p2, 10, cols - p2.name.size() - 2 - 10);
     } else if (c == 'q') {
       break;
     }
