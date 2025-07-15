@@ -12,6 +12,7 @@ struct Player {
   std::string name;
   int score = 0;
   bool is_turn = false;
+  bool update_from_previous_turn = false;
 };
 
 
@@ -198,13 +199,17 @@ void clear_init_screen(const int ypos, const int xpos) {
     std::cout << "                          ";
 }
 
-void draw_player_score(const Player &player, const int ypos, const int xpos){
-  /// y,x are the coordinates of the upper right corner of the text box
-  set_curs_position({ypos, xpos});
-  const int textwidth = player.name.size() + 4;
-  const int scorepos = textwidth / 2;
+void draw_player_score(const Player &player, const int ypos, const int xpos) {
   std::string color_modifier = player.is_turn ? "\x1b[48;5;172m" : "";
   std::string reset_color = player.is_turn ? "\x1b[0m": "";
+
+  const int textwidth = player.name.size() + 4;
+  const int scorepos = textwidth / 2;
+
+  set_curs_position({ypos+2, xpos + scorepos});
+  std::cout << "         "<< reset_color;
+  /// y,x are the coordinates of the upper right corner of the text box
+  set_curs_position({ypos, xpos});
   std::cout << color_modifier << "  " << player.name << "  ";
   set_curs_position({ypos+2, xpos + scorepos});
   std::cout << player.score << reset_color;
@@ -234,30 +239,40 @@ std::string get_key(const bool wait = false) {
   }
 }
 
-void read_score(Player &player, const int value, const int ypos,
+void read_score(Player &player_c, Player &player_o,
+                const int value, const int ypos,
                 const int xpos) {
   set_curs_position({ypos, xpos});
   std::cout << "\x1b[48;5;105m" << "Colpito (c), mancato (x)" << "\x1b[0m";
   while (true) {
     const char c = _getch();
     if (c == 'c') {
-      player.score = player.score + 20;
+      player_c.score = player_c.score + 20;
+      if (value == 6) {
+        player_c.score = player_c.score + 30;
+      }
       break;
     } else if (c == 'x') {
-      player.score = player.score - 5;
+      player_c.score = player_c.score - 5;
+      if (player_o.update_from_previous_turn) {
+        player_o.score = player_o.score + 10;
+        player_o.update_from_previous_turn = false;
+      }
       break;
     }
   }
   set_curs_position({ypos, xpos});
   std::cout << "                        ";
-  if (value == 1 or value == 6) {
+  if (value == 1) {
+    /// check the next turn if the other player scores or misses
+    player_c.update_from_previous_turn = true;
+  } else if (value == 2) {
      set_curs_position({ypos, xpos-4});
-     std::cout << "\x1b[48;5;105m" << "Distratto (y), non distratto (n)" << "\x1b[0m";
-
+     std::cout << "\x1b[48;5;105m" << "Prima partita? (y) (n)" << "\x1b[0m";
      while (true) {
        const char c = _getch();
        if (c == 'y') {
-         player.score = player.score + 10;
+         player_o.score = player_o.score - 20;
          break;
        } else if (c == 'n') {
          break;
@@ -294,7 +309,9 @@ int main(int argc, char** argv) {
     char c = _getch();
     if (c == 'r') {
       Player &current_player = (turn_count++ % 2 == 0) ? p1 : p2;
+      Player &other_player   = (&current_player == &p1) ? p2 : p1;
       current_player.is_turn = true;
+      other_player.is_turn = false;
 
       clear_init_screen(ScreenCentre.y, ScreenCentre.x - 13);
       draw_player_score(p1, 10, 10);
@@ -314,7 +331,7 @@ int main(int argc, char** argv) {
         }
       }
 
-      read_score(current_player, d.GetValue(),
+      read_score(current_player, other_player, d.GetValue(),
                  ScreenCentre.y+25, ScreenCentre.x - 13);
       draw_player_score(p1, 10, 10);
       draw_player_score(p2, 10, cols - p2.name.size() - 2 - 10);
