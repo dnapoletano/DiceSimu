@@ -308,12 +308,16 @@ int main(int argc, char** argv) {
     p1.is_turn = p2.is_turn = false;
     char c = _getch();
     if (c == 'r') {
+      if(turn_count == 0)
+        clear_init_screen(ScreenCentre.y, ScreenCentre.x - 13);
+      else
+        clear_init_screen(ScreenCentre.y + 25, ScreenCentre.x - 13);
+
       Player &current_player = (turn_count++ % 2 == 0) ? p1 : p2;
       Player &other_player   = (&current_player == &p1) ? p2 : p1;
       current_player.is_turn = true;
       other_player.is_turn = false;
 
-      clear_init_screen(ScreenCentre.y, ScreenCentre.x - 13);
       draw_player_score(p1, 10, 10);
       draw_player_score(p2, 10,cols - p2.name.size() - 2 - 10);
 
@@ -338,6 +342,7 @@ int main(int argc, char** argv) {
     } else if (c == 'q') {
       break;
     }
+    draw_init_screen(ScreenCentre.y+25, ScreenCentre.x - 13);
   }
   std::system("reset");
   return 0;
